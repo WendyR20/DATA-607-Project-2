@@ -1,0 +1,245 @@
+---
+title: 'Data 607 Project 2: Dataset 3'
+author: "Wendy Romero"
+date: "2025-10-05"
+output: 
+  html_document:
+      theme: default
+      highlight: tango
+      toc: true
+      toc_float: true
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+
+library(dplyr)
+library(tidyr)
+library(readr)
+library(ggplot2)
+library(ggrepel)
+
+```
+
+
+## Project 2 Dataset 3: Subject Score Data
+
+The third dataset we will be working with for Project 2 is untidy class score data. 
+
+For this dataset we are told the following: 
+
+"Why This Dataset Is Untidy: Multiple Variables in One Column Name, columns like Math_2019 combine subject and year.
+This violates the principle that each column should represent a single variable.
+
+Wide Format: each subject-year combination has its own column, creating many columns for multiple years.
+Makes filtering, aggregation, and plotting harder.
+
+Potential Analysis on the Tidied Dataset:
+Trend Analysis, track each student’s progress over the years per subject.
+Example: Did Alice’s Math score improve from 2019 to 2020?
+
+Comparison Across Subjects: compare average scores across subjects for a given year.
+Example: Are students performing better in Science than English?
+
+Group Analysis: compute class averages per year or subject.
+
+Identify the top-performing student per subject/year.
+
+Visualization:
+Line charts to show score trends over time.
+
+Box plots to show score distribution across subjects.
+
+Heatmaps to see overall performance patterns."
+
+Thus we must tidy the data by: converting it from wide to long format, then we need to create columns to hold the class subjects and years separately.
+
+Then we can track each student’s progress over the years per subject, compare the average scores across subjects for a given year, compute class averages per year or subject and the top-performing student per year. We can also create a box plot to show the class score distribution across subjects and we can create a heatmap to get a sense of the overall performance patterns.
+
+In working with this data set we will use the following libraries:
+
+- The **dplyr** library
+- The **tidyr** library
+- The **readr** library
+- The **ggplot2** library
+- The **ggrepel** library
+
+Note: the ggrepel library was used to make the graphs easier to read.
+
+
+We can start by reading in our data and taking a quick look at it after we save it to a dataframe:
+
+```{r read in data}
+url2 <- ("https://raw.githubusercontent.com/WendyR20/DATA-607-Project-2/refs/heads/main/untidygrades%20-%20Sheet1.csv")
+
+gdf <- read_csv(url2)
+
+glimpse(gdf)
+```
+
+# Cleaning Up Our Subject Score Data
+
+One of our first tasks is to convert the wide format of our data to a long format, since we want one column to hold each student's name and separate columns for their subjects and the year they received their scores. Thus we will be pivoting our data.
+ 
+```{r}
+
+gdf_long <- gdf %>%
+  pivot_longer(
+    cols = Math_2019:English_2020,
+    names_to = c("Subject","Year"),
+    names_sep = "_",
+    values_to = "Grade"
+  )
+glimpse(gdf_long)
+```
+
+Now that are data is tidy we can analyze our data properly.
+
+# Trend Analysis Per Student Per Subject
+
+Let's take a look at the scores students received in each subject from 2019 to 2020.
+
+```{r}
+
+ggplot(gdf_long, aes(x = Year, y = Grade, group = Student, color = Subject)) +
+  geom_line(alpha = 0.6) +
+  geom_point(size = 2) +
+  labs(title = "Student Grades Per Subject From 2019 to 2020",
+       x = "Year",
+       y = "Grade") +
+  geom_text_repel(
+    data = gdf_long %>% filter(Year == "2020"),  # label only at last year
+    aes(label = Student),
+    size = 3, 
+    show.legend = FALSE,
+    box.padding = 0.3,  
+    point.padding = 0.2, 
+    max.overlaps = 30 
+    )
+
+```
+
+# Comparing Student Scores Per Subject 
+
+Let's take a look at student performance per subject, perhaps we can find which students are outpeforming their peers.
+
+```{r}
+ggplot(gdf_long, aes(x = Student, y = Grade, fill = Year)) +
+  geom_col(position = "dodge") +
+  facet_wrap(~Subject) +
+  labs(title = "Student Scores Per Subject From 2019 to 2020",
+       x = "Student",
+       y = "Score")
+
+glimpse(gdf_long)
+
+```
+
+**As we can see from the graphs that Carol scored the highest grades in English and Math in both 2019 and 2020. Carol also scored the highest Science grade in Science in 2020, however it was Alice who scored the highest Science grade in 2019.**
+
+
+# Comparing Average Scores Across Subjects For 2020
+
+Let's convert the Grade column to a numeric data type so that we compute the average score across subjects
+```{r}
+
+gdf_long$Grade <- as.numeric(gdf_long$Grade) 
+```
+
+Now we can compute the average score across subjects, let's look specifically at the average scores for the year 2020. 
+
+```{r}
+gdf_mean <- gdf_long %>%
+  group_by(Year, Subject) %>%
+  summarise(Subject_Avg = mean(Grade, na.rm = TRUE)) %>%
+  ungroup()
+
+gdf_2020 <-gdf_mean %>%
+  filter(Year == "2020")
+
+ggplot(gdf_2020, aes(x = Subject, y = Subject_Avg, fill = Subject)) +
+  geom_col(position = "dodge") +
+  labs(title = "Averages Per Subject in 2020",
+       x = "Subject",
+       y = "Score")
+```  
+
+**The average score in 2020 for both English and Science are high, in both subject students on average scored above an 80. On the other hand students on average score a little bit under an 80 in English in 2020.**
+
+# Group Analysis: Class Averages Per Year and Per Subject
+
+Now we can compare the class averages from 2019 to 2020. We will be using two different graphs to compare the class averages per year, per subject. Either graphs alone can answer our questions but a box plot can tell us more about the variability of our data than a bar chart.
+
+### Our Bar Chart
+
+```{r}
+ggplot(gdf_mean, aes(x = Year, y = Subject_Avg, fill = Year)) +
+  geom_col(position = "dodge") +
+  facet_wrap(~Subject)+
+  labs(title = "Averages Per Subject 2019 to 2020",
+       x = "Subject",
+       y = "Score Average") +
+  geom_text(aes(label = Subject_Avg), color = "black") 
+
+```
+**Performing a group analysis gives us a better understanding of the average student scores per subject. We see that there has been improvement in the student average score across all subject from 2019 to 2020!** 
+
+
+### Now let's try the box plot.
+
+```{r plot, fig.width = 10, fig.height = 6}
+
+ggplot(gdf_long, aes(x = Subject, y = Grade, fill = Year)) +
+  geom_boxplot() +
+  labs( 
+    title = "Student Average Scores Per Subject",
+    x = "Subject",
+    y = "Scores") 
+```
+ 
+**Our box plot shows us that there is a larger spread of higher English scores, and a larger spread of lower Science scores.   ** 
+
+
+
+# Top Student Average Per Year
+
+Let's find the student with the top average from 2019 to 2020.
+
+```{r}
+gdf_smean <- gdf_long %>%
+  group_by(Year, Student) %>%
+  summarise(Student_Avg = mean(Grade, na.rm = TRUE)) %>%
+  ungroup()
+
+gdf_smean$Student_Avg <- round(gdf_smean$Student_Avg, digits = 2)
+
+ggplot(gdf_smean, aes(x = Student, y = Student_Avg, fill = Student)) +
+  geom_col(position = "dodge") +
+  facet_wrap(~Year)+
+  labs(title = "Student Averages 2019 to 2020",
+       x = "Student",
+       y = "Student Average") +
+  geom_text(aes(label = Student_Avg), color = "black") 
+
+```
+
+**As we can see Carol is the highest performing student overall, her average across subjects has been higher than that of her peers in both 2019 and 2020. This finding corroborates what we saw when we compared student scores per subject.**
+
+# Heatmap of Overall Performance
+
+Now let's look at overall performance and pay close attention to our low performers as well as our high performers.
+
+```{r}
+ggplot(gdf_long, aes(x = Subject, y = Student, fill = Grade)) +
+  geom_tile(color = "gray") +
+  facet_wrap(~Year) +
+  scale_fill_gradient2(low = "red", mid = "orange", high = "pink", midpoint = 80)+
+  labs(
+    title = "Overall Student Performance",
+    x = "Subject",
+    y = "Score"
+  )
+
+```
+
+**We can see that in both 2019 and 2020 David performed lower than his peers across subjects, Bob seems to be the second lowest performing student. Meanwhile Carol (as we know) is the highest performing student in both 2019 and 2020, followed by Alice as the next highest performing student.**
