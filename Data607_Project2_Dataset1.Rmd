@@ -1,0 +1,118 @@
+---
+title: "Data 607 Project 2 Dataset 1"
+author: "Wendy Romero"
+date: "2025-10-05"
+output: 
+  html_document:
+      theme: default
+      highlight: pygments
+      toc: true
+      toc_float: true
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+
+library(dplyr)
+library(tidyr)
+library(readr)
+library(ggplot2)
+```
+
+## Project 2 Dataset 1: Movie Survey Data
+
+The first dataset we will be working with for Project 2 is untidy movie survey data. 
+
+For this dataset we are told the following: 
+
+"This data is untidy because of the multiple variables in the header row. The column names (Daniel, Eleana, Susan, Winnie, Aiden) are actually values of a "Reviewer" variable. Each film’s ratings are spread across columns instead of being stacked into one column.
+
+Missing values are implicit for example Susan did not rate F1 the movie or Superman, and Daniel did not rate Mission Impossible. These appear as blanks instead of explicit missing values (NA).
+
+Since this dataset is movie ratings by multiple reviewers, several interesting analyses can be done once the data is in tidy form. For example. Identify movies with the largest variation (standard deviation) in ratings that shows disagreement among reviewers."
+
+Thus we must tidy the data by: converting it from wide to long format, then we need to create one column for the reviewers/rankers rather than having a column for each reviewer. We must also fill in missing data as NA.
+
+Then we can identify the movies with the largest standard deviation in ratings.
+
+In working with this data set we will use the following libraries:
+
+- The **dplyr** library
+- The **tidyr** library
+- The **readr** library
+- The **ggplot2** library
+
+
+We can start by reading in our data and taking a quick look at it after we save it to a dataframe:
+
+```{r read in data}
+url <- ("https://raw.githubusercontent.com/WendyR20/DATA-607-Project-2/refs/heads/main/untidy%20movie%20data%20-%20Sheet1.csv")
+
+mdf <- read_csv(url)
+
+glimpse(mdf)
+```
+
+# Cleaning Up Our Movie Survey Data
+
+One of our first tasks is to convert the wide format of our data to a long format, since we want one column to hold each reviewr/ranker's name and separate columns for their ratings. Thus we will be pivoting our data.
+ 
+```{r}
+mdf_long <- mdf %>%
+  
+  pivot_longer(
+    cols = Daniel:Aiden,
+    names_to = "Ranker", 
+    values_to = "Rating"
+  )
+glimpse(mdf_long)
+```
+
+
+Let's convert the Rating column to numeric
+
+```{r}
+mdf_long$Rating <- as.numeric(mdf_long$Rating)
+
+glimpse(mdf_long)
+```
+
+
+We can also arrange our dataframe by Film, then Ranker alphabetically.
+
+```{r}
+mdf2 <- mdf_long %>%
+  arrange(Film, Ranker)
+```
+
+# Finding the Film with the Greatest Standard Deviation in it's Reviewer Ratings
+
+First let's find the Mean and Standard deviation of Ratings:
+
+```{r}
+mdf2_summary <- mdf2 %>%
+  group_by(Film) %>%
+  summarise(
+    film_mean = mean(Rating, na.rm = TRUE),
+    film_sd = sd(Rating, na.rm = TRUE),
+    ratings_count = sum(!is.na(Rating))
+  )
+```
+
+
+Now we can plot the mean and standard deviation for the ratings of each film.
+
+```{r fig.width = 10, fig.height = 6}
+
+ggplot(mdf2_summary, aes(x = Film, y = film_mean, fill = Film)) +
+  geom_bar(position = position_dodge(), stat = "identity", color = "black") +
+  geom_errorbar(aes(ymin = film_mean-film_sd, ymax = film_mean+film_sd)) +
+  labs( 
+    title = "Film Ratings Standard Deviations",
+    x = "Films",
+    y = "Film Ratings Means and Standard Deviations") +
+  theme(axis.title.x = element_text(vjust = 0.5),
+        axis.text.x = element_text(angle = 45, vjust = 0.55))
+```
+
+We can see from our summary and from the graph that Mission Impossible has the highest variability among reviewers with Superman close behind. Thus, Mission Impossible has the most disagreement among viewers on it's rating.
