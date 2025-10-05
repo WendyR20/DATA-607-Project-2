@@ -1,0 +1,204 @@
+---
+title: 'Data 607: Project 2 Dataset 2'
+author: "Wendy Romero"
+date: "2025-10-05"
+output: 
+  html_document:
+      theme: cerulean
+      toc: true
+      toc_float: true
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+
+library(dplyr)
+library(tidyr)
+library(readr)
+library(ggplot2)
+```
+
+## Project 2 Dataset 2: Vaccine data
+
+Our second dataset is a hypothetical public health immunization report showing counts of flu shots, COVID boosters, and MMR vaccines given at 10 clinics from January to February 2023. 
+
+For this dataset we are tasked with the following: 
+
+"If this dataset were reshaped into a tidy format with clear columns such as Clinic ID, Clinic Name,Vaccine, Month and Dose given and then each row would represent one unambiguous observation — one vaccine count for one clinic in one month. In that format it would be straightforward to compare vaccine uptake across time and across clinics, identify which clinic has improved its coverage the fastest, calculate monthly averages or growth rates by vaccine type, and create time-series charts or dashboards without complex formulas."
+
+Thus we must tidy the data by: spliting up the clinic information into columns for the clinic id and the clinic name. We must also create columns for the vaccine type, and the month each vaccine was administered, and finally we must create a column for the vaccination count.
+
+Then we can identify which clinic has improved its coverage the fastest, calculate monthly averages or growth rates by vaccine type, and create time-series chart.
+
+In working with this data set we will use the following libraries:
+
+- The **dplyr** library
+- The **tidyr** library
+- The **readr** library
+- The **ggplot2** library
+
+
+We can start by reading in our data and taking a quick look at it after we save it to a dataframe:
+
+```{r reading in data}
+url3 <- ("https://raw.githubusercontent.com/WendyR20/DATA-607-Project-2/refs/heads/main/untidy%20vaccine%20data%20-%20Sheet1.csv")
+vdf <- read.csv(url3)
+
+glimpse(vdf)
+```
+
+# Cleaning Up Our Vaccine Data
+
+Let's rename the columns as when they were read in the column names became even messier.
+```{r}
+names(vdf) <- c("Clinic", "Flu-Jan-2023", "Flu-Feb-2023", "Covid-Jan-2023", "Covid-Feb-2023", 
+                "MMR-Jan-2023", "MMR-Feb-2023")
+
+glimpse(vdf)
+```
+
+Let's pivot our data so we can have separate columns for our vaccine type, and for the month and year when the vaccines were administered. 
+
+```{r}
+vdf_long <- vdf %>%
+  pivot_longer(
+    cols = `Flu-Jan-2023`:`MMR-Feb-2023`,
+    names_to = c("Vaccine", "Month", "Year"),
+    names_sep = "-",
+    values_to = "Vaccinations"
+    
+  )
+```
+
+Let's seperate the Clinic Info column into two columns and order our Month column.
+
+```{r}
+
+vdf2 <- vdf_long %>%
+  separate(Clinic, into = c("ClinicID", "ClinicName"), sep = "\\s*-\\s*")
+
+
+vdf3 <- vdf2 %>%
+  mutate(Month = factor(Month, levels = month.abb, ordered = TRUE))
+
+glimpse(vdf3)
+```
+
+# Comparing Vaccine count Across Time and Across Clinics
+
+Let's start by comparing vaccine counts across time, since our data only encompasses two months it will be easy to use a bar chart to compare the vaccine counts.
+
+```{r}
+vaccine_mcount <- vdf3 %>%
+  group_by(Vaccine, Month) %>%
+  summarise( 
+    Vaccinations_Total = sum(Vaccinations)
+  ) %>% 
+  ungroup()
+
+ggplot(vaccine_mcount, aes(x = Vaccine, y = Vaccinations_Total, fill = Month)) +
+  geom_col(position = "dodge") +
+  labs(
+    title = "Vaccination Count by Vaccine",
+    subtitle = "From January to February 2023",
+    x = "Vaccine",
+    y = "Total Vaccination Count"
+  ) 
+```
+
+**As we can see from our graph the Flu vaccine was the most administered vaccine, with nearly 5000 vaccinations overall from January to February 2023.**
+
+
+Now let's compare the vaccine counts accros clincs, since there are many clinics included in this dataset we'll be using comparing the bar charts of vaccine counts per each type of vaccine.
+
+```{r}
+vaccine_ccount <- vdf3 %>%
+  group_by(ClinicName, Vaccine) %>%
+  summarise( 
+  Total_Vaccinations = sum(Vaccinations)
+    ) %>% 
+  ungroup()
+
+ggplot(vaccine_ccount, aes(x = ClinicName, y = Total_Vaccinations, fill = ClinicName)) +
+  geom_col(position = "dodge") +
+  facet_wrap(~Vaccine) +
+  labs(
+    title = "Vaccination Count by Clinic",
+    subtitle = "From January to February 2023",
+    x = "Clinic",
+    y = "Total Vaccination Count"
+  ) +
+  theme(axis.title.x = element_text(vjust = 0.5),
+        axis.text.x = element_text(angle = 45, vjust = 0.55))
+
+
+```
+
+**As we can see from the graphs the Lakeside clinic administered the most vaccines of every type from January to February 2023.**
+
+
+# Identifying Which Clinic Improved its Coverage the Fastest
+
+```{r}
+clinic_growth <- vdf3 %>%
+  group_by(ClinicName, Vaccine) %>%
+  arrange(Month) %>%
+  summarise(
+    Clinic_GrowthRate = (last(Vaccinations) - first(Vaccinations)) / first(Vaccinations) * 100
+  ) %>%
+  arrange(desc(Clinic_GrowthRate))
+```
+
+Now let's plot the growth rate for each clinic and compare.
+
+```{r }
+ggplot(clinic_growth, aes(x = ClinicName, y = Clinic_GrowthRate, fill = Vaccine)) +
+  geom_col(position = "dodge") +
+  labs(
+    title = "Vaccination Growth Rate by Clinic",
+    subtitle = "From January to February 2023",
+    x = "Clinic",
+    y = "Vaccination Growth Rate"
+  ) +
+  theme(axis.title.x = element_text(vjust = 0.5),
+        axis.text.x = element_text(angle = 45, vjust = 0.55))
+```
+
+The growth rate of administered  Flu and MMR vaccines was largest in the Northside Clinic, outperforming every other clinic. Thus, for the Flu and MMR Vaccines the Northside Clinic most improved it’s coverage from January to February 2023.
+The growth rate of administered Covid vaccine was negative for every clinic, but least negative in the Greenfield Clinic. Thus, for the Covid Vaccine the Greenfield Clinic most improved it’s coverage from January to February 2023.
+
+
+# Calculating Monthly Average By Vaccine Type 
+
+Now we want to find the monthly average vaccinations by vaccine type, so let us create a quick summary:
+
+```{r}
+monthly_vavg <- vdf2 %>%
+  group_by(Vaccine, Month) %>%
+  summarise( VaccineMean = mean(Vaccinations, na.rm = TRUE))
+
+monthly_vavg
+```
+
+# Creating a Time-Series Chart
+
+```{r}
+
+ggplot(vdf3, aes(x = Month, y = Vaccinations, group = ClinicName, color = ClinicName)) +
+  geom_line(linewidth = 1.5) +
+  geom_point(size = 2) +
+  facet_wrap(~Vaccine, scales = "free_y") +
+  labs(
+    title = "Vaccine Counts Over Time by Clinic",
+    x = "Month",
+    y = "Vaccinations Count",
+    color = "Clinic"
+  ) +
+  theme_minimal() +
+  theme(
+    plot.title = element_text(face = "bold", size = 13),
+    legend.position = "bottom"
+  )
+
+```
+
